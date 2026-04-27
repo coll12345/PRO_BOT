@@ -1,3 +1,4 @@
+import os
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
@@ -84,24 +85,38 @@ async def send_start_menu(client, message_or_callback):
 ɪ ᴄᴀɴ ᴘʀᴏᴠɪᴅᴇ ᴍᴏᴠɪᴇs ᴀɴᴅ sᴇʀɪᴇs,
 ᴊᴜsᴛ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴇɴᴊᴏʏ."""
 
+    poster_exists = os.path.exists("poster.jpg")
+
     # If called via callback (Back button), delete old message first
     if hasattr(message_or_callback, "message"):
         try:
             await message_or_callback.message.delete()
         except:
             pass
-        await message_or_callback.message.reply_photo(
-            photo="poster.jpg",
-            caption=text,
-            reply_markup=buttons,
-        )
+        if poster_exists:
+            await message_or_callback.message.reply_photo(
+                photo="poster.jpg",
+                caption=text,
+                reply_markup=buttons,
+            )
+        else:
+            await message_or_callback.message.reply_text(
+                text,
+                reply_markup=buttons,
+            )
 
     else:
-        await message_or_callback.reply_photo(
-            photo="poster.jpg",
-            caption=text,
-            reply_markup=buttons,
-        )
+        if poster_exists:
+            await message_or_callback.reply_photo(
+                photo="poster.jpg",
+                caption=text,
+                reply_markup=buttons,
+            )
+        else:
+            await message_or_callback.reply_text(
+                text,
+                reply_markup=buttons,
+            )
 
 
 # =========================

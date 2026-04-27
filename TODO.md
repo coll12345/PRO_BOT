@@ -1,54 +1,17 @@
-# 24/7 Deployment Plan for TMPS Movie Bot
+# Fix Plan — Bot Running on Koyeb But Not Working
 
-## Information Gathered
-- Two separate Pyrogram clients exist: `bot.py` (main bot) and `userbot.py` (indexer/userbot).
-- Both must run simultaneously for full functionality.
-- `bot.py` currently calls `app.run(main())` at the top level, blocking import.
-- `userbot.py` is already import-safe (`if __name__ == "__main__":`).
-- MongoDB Atlas is used (cloud-hosted, no local DB needed).
-- Session files (`.session`) must be present at runtime.
-- Dependencies: pyrogram, tgcrypto, pymongo, pytz, requests.
+## Issues
+1. Fake health check always returns 200 even if bot is dead
+2. Hardcoded port 8000 ignores Koyeb's PORT env var
+3. No reconnection watchdog — bot can die silently
+4. `poster.jpg` crash risk on `/start`
+5. Silent plugin import failures
+6. Background task crashes are never restarted
 
-## Plan
-
-### Step 1: Refactor `bot.py` ✅
-- Wrap `app.run(main())` inside `if __name__ == "__main__":`.
-- This allows safe importing of the `app` object into a unified runner.
-
-### Step 2: Create `main.py` (Unified Entry Point) ✅
-- Import both `app` objects from `bot.py` and `userbot.py`.
-- Start both clients concurrently using `asyncio.gather`.
-- Use `pyrogram.idle()` to keep the process alive indefinitely.
-- This simplifies deployment to a single command: `python main.py`.
-
-### Step 3: Create `Procfile` ✅
-- Add `worker: python main.py` for Heroku/Railway/Render compatibility.
-
-### Step 4: Create `Dockerfile` ✅
-- Use `python:3.11-slim` base image.
-- Copy all project files including `.session` files.
-- Install requirements and set `CMD ["python", "main.py"]`.
-
-### Step 5: Create `.dockerignore` ✅
-- Exclude unnecessary files (`.git`, `__pycache__`, etc.).
-
-### Step 6: Create `start.sh` ✅
-- Simple bash script for Linux/VPS deployment.
-- Activates virtual env (if exists) and runs `python main.py`.
-
-### Step 7: Create `DEPLOY.md` ✅
-- Step-by-step instructions for:
-  - Railway / Render ( easiest free options )
-  - Heroku
-  - VPS / Dedicated Server
-  - Local Windows (background with `pythonw` or NSSM)
-
-## Dependent Files to Edit
-- `bot.py` (minor refactor) ✅
-- `userbot.py` (no changes needed) ✅
-
-## Follow-up Steps
-- Ensure `.session` files are included when pushing to cloud hosts.
-- Install requirements: `pip install -r requirements.txt`.
-- Start the bot: `python main.py` or via the platform's dashboard.
+## Steps
+- [x] Step 1: Update `main.py` — dynamic PORT, real health check, watchdog, explicit plugin imports, auto-restart tasks
+- [x] Step 2: Update `bot.py` — add `poster.jpg` existence check with text-only fallback
+- [x] Step 3: Update `Dockerfile` — add `ENV PORT=8000` and `EXPOSE 8000`
+- [x] Step 4: Update `requirements.txt` — pin `pyrogram>=2.0.0`
+- [x] Step 5: Verify all files are correct
 

@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy entire project (including .session files)
 COPY . .
 
+# Expose port for health check
+ENV PORT=8000
+EXPOSE 8000
+
 # Run the unified bot
 CMD ["python", "main.py"]
 

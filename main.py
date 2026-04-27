@@ -3,6 +3,7 @@ import sys
 import traceback
 import threading
 import os
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pyrogram import idle
 
@@ -12,32 +13,71 @@ from bot import app as bot_app, auto_delete_group_messages
 # DEPLOYMENT MODE (for Koyeb)
 # =========================
 BOT_ONLY_MODE = os.getenv("BOT_ONLY_MODE", "true").lower() == "true"
+PORT = int(os.getenv("PORT", "8000"))
 
 # =========================
-# DUMMY HTTP SERVER (for Koyeb/hosting platforms)
+# EXPLICIT PLUGIN IMPORTS (fail loud)
+# =========================
+print("📦 Loading plugins...")
+try:
+    import plugins.commands
+    print("  ✓ plugins.commands")
+except Exception as e:
+    print(f"  ⚠️ plugins.commands failed: {e}")
+
+try:
+    import plugins.search_new
+    print("  ✓ plugins.search_new")
+except Exception as e:
+    print(f"  ⚠️ plugins.search_new failed: {e}")
+
+try:
+    import plugins.shortener
+    print("  ✓ plugins.shortener")
+except Exception as e:
+    print(f"  ⚠️ plugins.shortener failed: {e}")
+
+# =========================
+# HEALTH CHECK SERVER (real bot status)
 # =========================
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain; charset=utf-8")
-        self.end_headers()
-        self.wfile.write("🤖 TMPS Movie Bot is running!".encode('utf-8'))
-    
+        try:
+            connected = bot_app.is_connected if bot_app else False
+            if connected:
+                self.send_response(200)
+                self.send_header("Content-type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write("🤖 TMPS Movie Bot is running!".encode('utf-8'))
+            else:
+                self.send_response(503)
+                self.send_header("Content-type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write("❌ Bot disconnected".encode('utf-8'))
+        except Exception as e:
+            self.send_response(500)
+            self.send_header("Content-type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(f"Server error: {e}".encode('utf-8'))
+
     def log_message(self, format, *args):
         pass  # Suppress logging
 
-def start_http_server(port=8000):
-    """Start dummy HTTP server in background thread"""
+def start_http_server(port=PORT):
+    """Start HTTP health check server in background thread"""
     try:
         server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         print(f"🌐 HTTP Health Check Server started on port {port}")
-        return True
+        return server
     except Exception as e:
         print(f"⚠️ Failed to start HTTP server: {e}")
-        return False
+        return None
 
+# =========================
+# BOT LIFECYCLE
+# =========================
 async def start_bot():
     try:
         print("📱 Starting Bot Client...")
@@ -46,7 +86,7 @@ async def start_bot():
         print(f"✅ Bot started: @{me.username} (ID: {me.id})")
         return True
     except Exception as e:
-        print(f"❌ Bot failed: {e}")
+        print(f"❌ Bot failed to start: {e}")
         traceback.print_exc()
         return False
 
@@ -59,17 +99,75 @@ async def stop_bot():
     except Exception as e:
         print(f"⚠️ Error stopping bot: {e}")
 
+async def restart_bot():
+    """Restart bot client if it disconnected"""
+    print("🔄 Attempting bot restart...")
+    try:
+        if bot_app.is_connected:
+            await bot_app.stop()
+            await asyncio.sleep(2)
+        await bot_app.start()
+        me = await bot_app.get_me()
+        print(f"✅ Bot reconnected: @{me.username}")
+        return True
+    except Exception as e:
+        print(f"❌ Bot restart failed: {e}")
+        return False
+
+# =========================
+# WATCHDOG (auto-restart on disconnect)
+# =========================
+async def bot_watchdog():
+    """Monitor bot connection and auto-restart if dead"""
+    while True:
+        await asyncio.sleep(30)
+        try:
+            if not bot_app.is_connected:
+                print("⚠️ Watchdog: Bot disconnected! Attempting restart...")
+                ok = await restart_bot()
+                if not ok:
+                    print("❌ Watchdog: Restart failed, will retry in 60s")
+                    await asyncio.sleep(60)
+            else:
+                # Optional: ping Telegram to verify real connectivity
+                pass
+        except Exception as e:
+            print(f"⚠️ Watchdog error: {e}")
+            await asyncio.sleep(30)
+
+# =========================
+# BACKGROUND TASKS (auto-restart on crash)
+# =========================
+async def resilient_task(coro, name):
+    """Wrap a coroutine so it auto-restarts on crash"""
+    while True:
+        try:
+            print(f"🚀 Starting {name}...")
+            await coro()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"💥 {name} crashed: {e}")
+            traceback.print_exc()
+            print(f"🔁 {name} will restart in 10 seconds...")
+            await asyncio.sleep(10)
+
+# =========================
+# MAIN
+# =========================
 async def main():
     print("\n" + "=" * 70)
-    print("🚀 STARTING TMPS MOVIE BOT (BOT-ONLY MODE)")
+    print("🚀 STARTING TMPS MOVIE BOT")
     print("=" * 70 + "\n")
 
     # Start HTTP server for hosting platforms
-    start_http_server(port=8000)
+    http_server = start_http_server(port=PORT)
+    if not http_server:
+        print("❌ FATAL: Could not start HTTP server. Exiting.")
+        sys.exit(1)
 
     # Start bot
     bot_ok = await start_bot()
-
     if not bot_ok:
         print("\n❌ FATAL: Bot failed to start. Exiting.")
         sys.exit(1)
@@ -80,26 +178,33 @@ async def main():
 
     tasks = []
 
-    print("🧹 Starting auto-delete group messages task...")
-    try:
-        tasks.append(asyncio.create_task(auto_delete_group_messages()))
-    except Exception as e:
-        print(f"⚠️ Error starting auto-delete task: {e}")
+    # Bot watchdog (monitors connection)
+    tasks.append(asyncio.create_task(bot_watchdog(), name="watchdog"))
+
+    # Auto-delete group messages (resilient wrapper)
+    tasks.append(asyncio.create_task(
+        resilient_task(auto_delete_group_messages, "AutoDelete"),
+        name="auto_delete"
+    ))
 
     print("\n" + "=" * 70)
     print("✅ BOT READY!")
-    print("🔁 BOT RUNNING 24/7 - Press Ctrl+C to stop")
+    print(f"🔁 BOT RUNNING 24/7 on port {PORT}")
     print("=" * 70 + "\n")
 
+    # Keep alive
     try:
         await idle()
     except KeyboardInterrupt:
         print("\n\n⏸️ Received shutdown signal...")
     except Exception as idle_err:
         print(f"\n⚠️ idle() exited unexpectedly: {idle_err}")
-        # Fallback keep-alive
+        # Fallback: sleep loop with periodic health checks
         while True:
-            await asyncio.sleep(3600)
+            await asyncio.sleep(60)
+            if not bot_app.is_connected:
+                print("⚠️ idle fallback: bot disconnected, attempting restart...")
+                await restart_bot()
     finally:
         print("\n🧹 Cleaning up background tasks...")
         for task in tasks:
@@ -108,6 +213,8 @@ async def main():
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         await stop_bot()
+        if http_server:
+            http_server.shutdown()
         print("\n✅ Shutdown complete!")
 
 if __name__ == "__main__":
