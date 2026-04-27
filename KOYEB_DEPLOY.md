@@ -22,8 +22,8 @@ git remote add origin https://github.com/YOUR_USERNAME/tm_bot.git
 git push -u origin main
 ```
 
-### Step 2: Create `Procfile` (Already exists)
-Verify it contains:
+### Step 2: Verify `Procfile` (Already exists)
+Make sure `Procfile` contains:
 ```
 worker: python main.py
 ```
@@ -43,16 +43,19 @@ PORT=8000
 3. Choose **"GitHub"** as source
 4. Connect your GitHub account
 5. Select repository: `tm_bot`
-6. Set deployment settings:
+6. **IMPORTANT: Select Build Method → "Buildpack"** (NOT Docker)
+7. Set deployment settings:
    - **Name:** `tmps-movie-bot`
    - **Build Command:** `pip install -r requirements.txt`
    - **Run Command:** `python main.py`
    - **Port:** `8000`
 
-7. Set **Environment Variables:**
+8. Set **Environment Variables:**
    - `BOT_ONLY_MODE` = `true`
 
-8. Click **"Deploy"**
+9. Click **"Deploy"**
+
+> 💡 **Why Buildpack?** Koyeb's Docker builder sometimes fails with "containerd timeout" errors. Buildpack uses native Python deployment and works reliably.
 
 ---
 
