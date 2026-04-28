@@ -4,6 +4,7 @@ from pymongo import MongoClient
 import math
 import asyncio
 import hashlib
+import traceback
 from .shortener import shorten
 from bot import app, MOVIE_CHANNEL
 
@@ -30,36 +31,37 @@ user_queries = {}
 
 @app.on_message(filters.text & ~filters.regex(r'^/') & filters.private)
 async def search_movie(client, message):
-    query = message.text.lower().strip()
-    
-    print(f"DEBUG: Search handler triggered with query: '{query}'")
-
-    if not query:
-        print(f"DEBUG: Empty query, ignoring")
-        return
-
-    # Try fast text search first
     try:
-        results = list(collection.find(
-            {"$text": {"$search": query}},
-            {"name": 1, "id": 1, "size": 1, "score": {"$meta": "textScore"}}
-        ).sort([("score", {"$meta": "textScore"})]).limit(MAX_RESULTS))
-    except Exception:
-        results = []
+        query = message.text.lower().strip()
+        
+        print(f"DEBUG: Search handler triggered with query: '{query}'")
 
-    # Fallback to regex if text search yields nothing
-    if not results:
-        results = list(collection.find(
-            {"name": {"$regex": query, "$options": "i"}},
-            {"name": 1, "id": 1, "size": 1}
-        ).limit(MAX_RESULTS))
+        if not query:
+            print(f"DEBUG: Empty query, ignoring")
+            return
 
-    if not results:
-        user = message.from_user
-        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "User"
-        user_mention = user.mention(full_name)
+        # Try fast text search first
+        try:
+            results = list(collection.find(
+                {"$text": {"$search": query}},
+                {"name": 1, "id": 1, "size": 1, "score": {"$meta": "textScore"}}
+            ).sort([("score", {"$meta": "textScore"})]).limit(MAX_RESULTS))
+        except Exception:
+            results = []
 
-        text = f"""Hey {user_mention} 👋
+        # Fallback to regex if text search yields nothing
+        if not results:
+            results = list(collection.find(
+                {"name": {"$regex": query, "$options": "i"}},
+                {"name": 1, "id": 1, "size": 1}
+            ).limit(MAX_RESULTS))
+
+        if not results:
+            user = message.from_user
+            full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "User"
+            user_mention = user.mention(full_name)
+
+            text = f"""Hey {user_mention} 👋
 
 😕 No results found for: {message.text}
 
@@ -71,23 +73,31 @@ async def search_movie(client, message):
 🎬 Still not found?
 It may not be available in my database yet."""
 
-        google_url = f"https://www.google.com/search?q={message.text.replace(' ', '+')}+movie"
+            google_url = f"https://www.google.com/search?q={message.text.replace(' ', '+')}+movie"
 
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔍 Search on Google", url=google_url)]
-        ])
+            buttons = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 Search on Google", url=google_url)]
+            ])
 
-        await message.reply_text(
-            text,
-            reply_markup=buttons,
-            disable_web_page_preview=True,
-        )
-        return
+            await message.reply_text(
+                text,
+                reply_markup=buttons,
+                disable_web_page_preview=True,
+            )
+            return
 
-    user_results[message.from_user.id] = results
-    user_queries[message.from_user.id] = message.text
+        user_results[message.from_user.id] = results
+        user_queries[message.from_user.id] = message.text
 
-    await send_page(client, message, message.from_user.id, 0)
+        await send_page(client, message, message.from_user.id, 0)
+
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR in search_movie handler: {e}")
+        traceback.print_exc()
+        try:
+            await message.reply_text("⚠️ An error occurred while searching. Please try again later.")
+        except Exception:
+            pass
 
 
 async def send_page(client, message, user_id, page):
@@ -151,18 +161,19 @@ async def send_page(client, message, user_id, page):
 
 @app.on_callback_query(filters.regex("get_"))
 async def movie_link_handler(client, callback_query):
-    msg_id = int(callback_query.data.split("_")[1])
-    user_id = callback_query.from_user.id
-    hash_key = hashlib.md5(f"{user_id}{msg_id}tm_bot_secret".encode()).hexdigest()[:8]
-    me = await client.get_me()
-    deep_link = f"https://t.me/{me.username}?start=verify_{user_id}_{msg_id}_{hash_key}"
-    verify_url = await shorten(client, deep_link, callback_query.message.chat.id)
+    try:
+        msg_id = int(callback_query.data.split("_")[1])
+        user_id = callback_query.from_user.id
+        hash_key = hashlib.md5(f"{user_id}{msg_id}tm_bot_secret".encode()).hexdigest()[:8]
+        me = await client.get_me()
+        deep_link = f"https://t.me/{me.username}?start=verify_{user_id}_{msg_id}_{hash_key}"
+        verify_url = await shorten(client, deep_link, callback_query.message.chat.id)
 
-    # Fetch movie details from DB
-    movie_doc = collection.find_one({"id": msg_id})
-    file_name = movie_doc["name"] if movie_doc else "Unknown File"
+        # Fetch movie details from DB
+        movie_doc = collection.find_one({"id": msg_id})
+        file_name = movie_doc["name"] if movie_doc else "Unknown File"
 
-    text = f"""🔗 Verification URL - Open for Movies
+        text = f"""🔗 Verification URL - Open for Movies
 {verify_url}
 
 👆 Click → Ads → Your movie files! 🎬
@@ -170,22 +181,31 @@ async def movie_link_handler(client, callback_query):
 📁 {file_name}
 
 For More Movies Join :- @TMPS_Movies"""
-    buttons = [[InlineKeyboardButton("🔗 Open Verification Link", url=verify_url)]]
+        buttons = [[InlineKeyboardButton("🔗 Open Verification Link", url=verify_url)]]
 
-    await callback_query.message.reply_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(buttons),
-        disable_web_page_preview=False
-    )
-    await callback_query.answer("Link generated!")
+        await callback_query.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            disable_web_page_preview=False
+        )
+        await callback_query.answer("Link generated!")
+    except Exception as e:
+        print(f"❌ ERROR in movie_link_handler: {e}")
+        traceback.print_exc()
+        await callback_query.answer("⚠️ Failed to generate link", show_alert=True)
 
 
 @app.on_callback_query(filters.regex("page_"))
 async def change_page(client, callback_query):
-    page = int(callback_query.data.split("_")[1]) - 1
-    message = callback_query.message
-    await send_page(client, message, callback_query.from_user.id, page)
-    await callback_query.answer()
+    try:
+        page = int(callback_query.data.split("_")[1]) - 1
+        message = callback_query.message
+        await send_page(client, message, callback_query.from_user.id, page)
+        await callback_query.answer()
+    except Exception as e:
+        print(f"❌ ERROR in change_page: {e}")
+        traceback.print_exc()
+        await callback_query.answer("⚠️ Error changing page", show_alert=True)
 
 
 @app.on_callback_query(filters.regex("ignore"))
@@ -200,4 +220,3 @@ async def close_results(client, callback_query):
     except Exception:
         pass
     await callback_query.answer("Closed")
-

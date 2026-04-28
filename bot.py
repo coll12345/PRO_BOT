@@ -5,6 +5,10 @@ from datetime import datetime
 import pytz
 import asyncio
 
+# Absolute base directory for reliable file paths on any platform
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+POSTER_PATH = os.path.join(BASE_DIR, "poster.jpg")
+
 API_ID = 30393136
 API_HASH = "4b2a23c681028e19cba2f63155e00f31"
 BOT_TOKEN = "8743247622:AAH5zXO4GXlxq2a-PWvy-Y3-Dpy8ds-9Ds0"
@@ -87,31 +91,35 @@ async def send_start_menu(client, message_or_callback):
 ɪ ᴄᴀɴ ᴘʀᴏᴠɪᴅᴇ ᴍᴏᴠɪᴇs ᴀɴᴅ sᴇʀɪᴇs,
 ᴊᴜsᴛ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴇɴᴊᴏʏ."""
 
-        poster_exists = os.path.exists("poster.jpg")
-        print(f"DEBUG: poster.jpg exists: {poster_exists}")
+        poster_exists = os.path.exists(POSTER_PATH)
+        print(f"DEBUG: poster.jpg exists at {POSTER_PATH}: {poster_exists}")
 
         # If called via callback (Back button), delete old message first
         if hasattr(message_or_callback, "message"):
+            chat_id = message_or_callback.message.chat.id
             try:
                 await message_or_callback.message.delete()
-            except:
-                pass
+            except Exception as del_err:
+                print(f"DEBUG: Could not delete old menu message: {del_err}")
+            # Send fresh message to chat (not reply to deleted message)
             if poster_exists:
-                await message_or_callback.message.reply_photo(
-                    photo="poster.jpg",
+                await client.send_photo(
+                    chat_id=chat_id,
+                    photo=POSTER_PATH,
                     caption=text,
                     reply_markup=buttons,
                 )
             else:
-                await message_or_callback.message.reply_text(
-                    text,
+                await client.send_message(
+                    chat_id=chat_id,
+                    text=text,
                     reply_markup=buttons,
                 )
 
         else:
             if poster_exists:
                 await message_or_callback.reply_photo(
-                    photo="poster.jpg",
+                    photo=POSTER_PATH,
                     caption=text,
                     reply_markup=buttons,
                 )
@@ -230,7 +238,7 @@ Unlock EVERYTHING with TMPS Premium and NEVER wait for movies again! 🚀
 
 🎉 Join the VIP club NOW & enjoy movies like a PRO!
 
-⏳ Don’t waste time, every second without Premium is a missed blockbuster! 💥
+⏳ Don't waste time, every second without Premium is a missed blockbuster! 💥
 """
 
     buttons = InlineKeyboardMarkup(
@@ -284,4 +292,3 @@ Enjoy movies, hassle-free! 🎬🍿
     )
 
 # Bot is started from main.py
-

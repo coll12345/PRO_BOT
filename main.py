@@ -4,6 +4,7 @@ import traceback
 import threading
 import os
 import time
+import glob
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pyrogram import idle
 
@@ -14,6 +15,29 @@ from bot import app as bot_app, auto_delete_group_messages
 # =========================
 BOT_ONLY_MODE = os.getenv("BOT_ONLY_MODE", "true").lower() == "true"
 PORT = int(os.getenv("PORT", "8000"))
+
+# =========================
+# SESSION CLEANUP (prevent SQLite lock on Koyeb)
+# =========================
+def cleanup_session_journals():
+    """Remove stale .session-journal files that block Pyrogram startup."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    patterns = [
+        os.path.join(base_dir, "*.session-journal"),
+        os.path.join(base_dir, "*.session-journal-*"),
+    ]
+    removed = 0
+    for pattern in patterns:
+        for fpath in glob.glob(pattern):
+            try:
+                os.remove(fpath)
+                print(f"🧹 Cleaned stale session file: {os.path.basename(fpath)}")
+                removed += 1
+            except Exception as e:
+                print(f"⚠️ Could not remove {fpath}: {e}")
+    if removed == 0:
+        print("🧹 No stale session journals found")
+    return removed
 
 # =========================
 # EXPLICIT PLUGIN IMPORTS (fail loud)
@@ -108,6 +132,8 @@ async def start_bot():
         await bot_app.start()
         me = await bot_app.get_me()
         print(f"✅ Bot started: @{me.username} (ID: {me.id})")
+        # Give dispatcher time to fully initialize
+        await asyncio.sleep(2)
         return True
     except Exception as e:
         print(f"❌ Bot failed to start: {e}")
@@ -133,6 +159,7 @@ async def restart_bot():
         await bot_app.start()
         me = await bot_app.get_me()
         print(f"✅ Bot reconnected: @{me.username}")
+        await asyncio.sleep(2)
         return True
     except Exception as e:
         print(f"❌ Bot restart failed: {e}")
@@ -146,7 +173,8 @@ async def bot_watchdog():
     while True:
         await asyncio.sleep(30)
         try:
-            if not bot_app.is_connected:
+            is_connected = getattr(bot_app, "is_connected", False)
+            if not is_connected:
                 print("⚠️ Watchdog: Bot disconnected! Attempting restart...")
                 ok = await restart_bot()
                 if not ok:
@@ -157,6 +185,7 @@ async def bot_watchdog():
                 pass
         except Exception as e:
             print(f"⚠️ Watchdog error: {e}")
+            traceback.print_exc()
             await asyncio.sleep(30)
 
 # =========================
@@ -183,6 +212,9 @@ async def main():
     print("\n" + "=" * 70)
     print("🚀 STARTING TMPS MOVIE BOT")
     print("=" * 70 + "\n")
+
+    # Clean stale session files before starting
+    cleanup_session_journals()
 
     # Start HTTP server for hosting platforms
     http_server = start_http_server(port=PORT)
@@ -226,7 +258,8 @@ async def main():
         # Fallback: sleep loop with periodic health checks
         while True:
             await asyncio.sleep(60)
-            if not bot_app.is_connected:
+            is_connected = getattr(bot_app, "is_connected", False)
+            if not is_connected:
                 print("⚠️ idle fallback: bot disconnected, attempting restart...")
                 await restart_bot()
     finally:
@@ -248,4 +281,3 @@ if __name__ == "__main__":
         print(f"\n❌ CRITICAL ERROR: {e}")
         traceback.print_exc()
         sys.exit(1)
-
