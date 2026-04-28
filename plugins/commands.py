@@ -1,6 +1,7 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from .shortener import shorteners_db  # Shared MongoDB
+from bot import app
 
 # Global ADMINS
 ADMINS = [5036765942, 8418744969, 5695787932]  # @ITSMEEANONYMOUSSSS @ImNobodyYouKnow @ITSMEEANONYMOUSSS
@@ -15,7 +16,7 @@ async def is_admin(client: Client, chat_id: int, user_id: int) -> bool:
     except:
         return False
 
-@Client.on_message(filters.command("setlink"))
+@app.on_message(filters.command("setlink"))
 async def setlink(client: Client, message):
     if not await is_admin(client, message.chat.id, message.from_user.id):
         await message.reply_text("❌ Admin only!")
@@ -34,7 +35,7 @@ async def setlink(client: Client, message):
     print(f"✅ Set token for {chat_id}: {token[:10]}...")
     await message.reply_text("✅ Set!")
 
-@Client.on_message(filters.command("showlink"))
+@app.on_message(filters.command("showlink"))
 async def showlink(client: Client, message):
     if not await is_admin(client, message.chat.id, message.from_user.id):
         await message.reply_text("❌ Admin only!")
@@ -45,7 +46,7 @@ async def showlink(client: Client, message):
     else:
         await message.reply_text("Default token used.")
 
-@Client.on_message(filters.command("rmlink"))
+@app.on_message(filters.command("rmlink"))
 async def rmlink(client: Client, message):
     if not await is_admin(client, message.chat.id, message.from_user.id):
         await message.reply_text("❌ Admin only!")

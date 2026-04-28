@@ -5,6 +5,7 @@ import math
 import asyncio
 import hashlib
 from .shortener import shorten
+from bot import app
 
 # CONFIG
 MOVIE_CHANNEL = -1002195257765
@@ -28,7 +29,7 @@ user_results = {}
 user_queries = {}
 
 
-@Client.on_message(filters.text & ~filters.regex(r'^/'))
+@app.on_message(filters.text & ~filters.regex(r'^/'))
 async def search_movie(client, message):
     query = message.text.lower().strip()
 
@@ -146,7 +147,7 @@ async def send_page(client, message, user_id, page):
         )
 
 
-@Client.on_callback_query(filters.regex("get_"))
+@app.on_callback_query(filters.regex("get_"))
 async def movie_link_handler(client, callback_query):
     msg_id = int(callback_query.data.split("_")[1])
     user_id = callback_query.from_user.id
@@ -177,7 +178,7 @@ For More Movies Join :- @TMPS_Movies"""
     await callback_query.answer("Link generated!")
 
 
-@Client.on_callback_query(filters.regex("page_"))
+@app.on_callback_query(filters.regex("page_"))
 async def change_page(client, callback_query):
     page = int(callback_query.data.split("_")[1]) - 1
     message = callback_query.message
@@ -185,12 +186,12 @@ async def change_page(client, callback_query):
     await callback_query.answer()
 
 
-@Client.on_callback_query(filters.regex("ignore"))
+@app.on_callback_query(filters.regex("ignore"))
 async def ignore(client, callback_query):
     await callback_query.answer()
 
 
-@Client.on_callback_query(filters.regex("close_results"))
+@app.on_callback_query(filters.regex("close_results"))
 async def close_results(client, callback_query):
     try:
         await callback_query.message.delete()
