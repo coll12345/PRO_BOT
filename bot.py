@@ -4,11 +4,13 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 import pytz
 import asyncio
-from plugins.search_new import MOVIE_CHANNEL
 
 API_ID = 30393136
 API_HASH = "4b2a23c681028e19cba2f63155e00f31"
 BOT_TOKEN = "8743247622:AAH5zXO4GXlxq2a-PWvy-Y3-Dpy8ds-9Ds0"
+
+# Movie Channel ID
+MOVIE_CHANNEL = -1002195257765
 
 # CREATE APP
 app = Client(

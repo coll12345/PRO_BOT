@@ -5,10 +5,9 @@ import math
 import asyncio
 import hashlib
 from .shortener import shorten
-from bot import app
+from bot import app, MOVIE_CHANNEL
 
 # CONFIG
-MOVIE_CHANNEL = -1002195257765
 MONGO_URI = "mongodb+srv://Dileep:dileep123@cluster0.gejzy.mongodb.net/?retryWrites=true&w=majority"
 
 mongo = MongoClient(MONGO_URI)
