@@ -50,74 +50,81 @@ async def auto_delete_group_messages():
 # SEND START MENU FUNCTION
 # =========================
 async def send_start_menu(client, message_or_callback):
-    user = message_or_callback.from_user
-    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "User"
-    user_mention = user.mention(full_name)
+    try:
+        user = message_or_callback.from_user
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "User"
+        user_mention = user.mention(full_name)
 
-    ist = pytz.timezone('Asia/Kolkata')
-    hour = datetime.now(ist).hour
+        ist = pytz.timezone('Asia/Kolkata')
+        hour = datetime.now(ist).hour
 
-    if 5 <= hour < 12:
-        greet = "ɢᴏᴏᴅ ᴍᴏʀɴɪɴɢ 🌅"
-    elif 12 <= hour < 17:
-        greet = "ɢᴏᴏᴅ ᴀꜰᴛᴇʀɴᴏᴏɴ ☀️"
-    elif 17 <= hour < 21:
-        greet = "ɢᴏᴏᴅ ᴇᴠᴇɴɪɴɢ 🌆"
-    else:
-        greet = "ɢᴏᴏᴅ ɴɪɢʜᴛ 🌙"
+        if 5 <= hour < 12:
+            greet = "ɢᴏᴏᴅ ᴍᴏʀɴɪɴɢ 🌅"
+        elif 12 <= hour < 17:
+            greet = "ɢᴏᴏᴅ ᴀꜰᴛᴇʀɴᴏᴏɴ ☀️"
+        elif 17 <= hour < 21:
+            greet = "ɢᴏᴏᴅ ᴇᴠᴇɴɪɴɢ 🌆"
+        else:
+            greet = "ɢᴏᴏᴅ ɴɪɢʜᴛ 🌙"
 
-    buttons = InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("➕ Add Me To Your Own Group", url="https://t.me/TMPS_Movie_bot?startgroup=true")],
+        buttons = InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("💥 Movie Updates", url="https://t.me/+LzW13Oz_iqUxYTJl"),
-                InlineKeyboardButton("🎬 Movie Group", url="https://t.me/+mLAgQEMIxa1kOGI1")
-            ],
-            [
-                InlineKeyboardButton("💰 Earn Money", callback_data="earn"),
-                InlineKeyboardButton("👨‍💻 About Me", callback_data="about")
-            ],
-            [InlineKeyboardButton("💎 Premium Membership 💎", callback_data="sub")]
-        ]
-    )
+                [InlineKeyboardButton("➕ Add Me To Your Own Group", url="https://t.me/TMPS_Movie_bot?startgroup=true")],
+                [
+                    InlineKeyboardButton("💥 Movie Updates", url="https://t.me/+LzW13Oz_iqUxYTJl"),
+                    InlineKeyboardButton("🎬 Movie Group", url="https://t.me/+mLAgQEMIxa1kOGI1")
+                ],
+                [
+                    InlineKeyboardButton("💰 Earn Money", callback_data="earn"),
+                    InlineKeyboardButton("👨‍💻 About Me", callback_data="about")
+                ],
+                [InlineKeyboardButton("💎 Premium Membership 💎", callback_data="sub")]
+            ]
+        )
 
-    text = f"""Hᴇʏ {user_mention} {greet} 👋
+        text = f"""Hᴇʏ {user_mention} {greet} 👋
 
 ɪ ᴄᴀɴ ᴘʀᴏᴠɪᴅᴇ ᴍᴏᴠɪᴇs ᴀɴᴅ sᴇʀɪᴇs,
 ᴊᴜsᴛ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ᴇɴᴊᴏʏ."""
 
-    poster_exists = os.path.exists("poster.jpg")
+        poster_exists = os.path.exists("poster.jpg")
+        print(f"DEBUG: poster.jpg exists: {poster_exists}")
 
-    # If called via callback (Back button), delete old message first
-    if hasattr(message_or_callback, "message"):
-        try:
-            await message_or_callback.message.delete()
-        except:
-            pass
-        if poster_exists:
-            await message_or_callback.message.reply_photo(
-                photo="poster.jpg",
-                caption=text,
-                reply_markup=buttons,
-            )
-        else:
-            await message_or_callback.message.reply_text(
-                text,
-                reply_markup=buttons,
-            )
+        # If called via callback (Back button), delete old message first
+        if hasattr(message_or_callback, "message"):
+            try:
+                await message_or_callback.message.delete()
+            except:
+                pass
+            if poster_exists:
+                await message_or_callback.message.reply_photo(
+                    photo="poster.jpg",
+                    caption=text,
+                    reply_markup=buttons,
+                )
+            else:
+                await message_or_callback.message.reply_text(
+                    text,
+                    reply_markup=buttons,
+                )
 
-    else:
-        if poster_exists:
-            await message_or_callback.reply_photo(
-                photo="poster.jpg",
-                caption=text,
-                reply_markup=buttons,
-            )
         else:
-            await message_or_callback.reply_text(
-                text,
-                reply_markup=buttons,
-            )
+            if poster_exists:
+                await message_or_callback.reply_photo(
+                    photo="poster.jpg",
+                    caption=text,
+                    reply_markup=buttons,
+                )
+            else:
+                await message_or_callback.reply_text(
+                    text,
+                    reply_markup=buttons,
+                )
+    except Exception as e:
+        print(f"ERROR in send_start_menu: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 # =========================
@@ -125,6 +132,7 @@ async def send_start_menu(client, message_or_callback):
 # =========================
 @app.on_message(filters.command("start"))
 async def start(client, message):
+    print(f"DEBUG: /start command received from {message.from_user.id}")
     data = message.command[1] if len(message.command) > 1 else None
     if data and data.startswith("verify_"):
         try:
@@ -148,10 +156,12 @@ async def start(client, message):
                         pass
                 asyncio.create_task(delete_msg())
                 return
-        except:
+        except Exception as e:
+            print(f"DEBUG: Verify failed: {e}")
             pass
     # Only plain /start shows menu - BRO handled above
     if not data:
+        print(f"DEBUG: Sending start menu to {message.from_user.id}")
         await send_start_menu(client, message)
 
 # =========================

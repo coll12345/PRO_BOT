@@ -21,21 +21,45 @@ PORT = int(os.getenv("PORT", "8000"))
 print("📦 Loading plugins...")
 try:
     import plugins.commands
-    print("  ✓ plugins.commands")
+    print("  ✓ plugins.commands loaded")
 except Exception as e:
-    print(f"  ⚠️ plugins.commands failed: {e}")
+    print(f"  ❌ plugins.commands failed: {e}")
+    import traceback
+    traceback.print_exc()
 
 try:
     import plugins.search_new
-    print("  ✓ plugins.search_new")
+    print("  ✓ plugins.search_new loaded")
 except Exception as e:
-    print(f"  ⚠️ plugins.search_new failed: {e}")
+    print(f"  ❌ plugins.search_new failed: {e}")
+    import traceback
+    traceback.print_exc()
 
 try:
     import plugins.shortener
-    print("  ✓ plugins.shortener")
+    print("  ✓ plugins.shortener loaded")
 except Exception as e:
-    print(f"  ⚠️ plugins.shortener failed: {e}")
+    print(f"  ❌ plugins.shortener failed: {e}")
+    import traceback
+    traceback.print_exc()
+
+print("📦 All plugins loaded!")
+
+# =========================
+# VERIFY HANDLERS REGISTERED
+# =========================
+print("\n📊 Checking registered handlers on bot_app...")
+try:
+    handlers_count = len(bot_app.handlers)
+    print(f"  Total handler groups: {handlers_count}")
+    for group_num, handler_list in enumerate(bot_app.handlers):
+        print(f"  Group {group_num}: {len(handler_list)} handler(s)")
+        for handler in handler_list[:3]:  # Show first 3
+            print(f"    - {handler}")
+except Exception as e:
+    print(f"  Error checking handlers: {e}")
+
+
 
 # =========================
 # HEALTH CHECK SERVER (real bot status)

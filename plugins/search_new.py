@@ -28,11 +28,14 @@ user_results = {}
 user_queries = {}
 
 
-@app.on_message(filters.text & ~filters.regex(r'^/'))
+@app.on_message(filters.text & ~filters.regex(r'^/') & filters.private)
 async def search_movie(client, message):
     query = message.text.lower().strip()
+    
+    print(f"DEBUG: Search handler triggered with query: '{query}'")
 
     if not query:
+        print(f"DEBUG: Empty query, ignoring")
         return
 
     # Try fast text search first
